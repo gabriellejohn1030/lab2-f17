@@ -13,12 +13,12 @@ exec(char *path, char **argv)
   char *s, *last;
   int i, off;
   uint argc, sz, sp, ustack[3+MAXARG+1];
+//  uint stackSZ;
   struct elfhdr elf;
   struct inode *ip;
   struct proghdr ph;
   pde_t *pgdir, *oldpgdir;
   struct proc *curproc = myproc();
-
   begin_op();
 
   if((ip = namei(path)) == 0){
@@ -63,11 +63,12 @@ exec(char *path, char **argv)
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible.  Use the second as the user stack.
   sz = PGROUNDUP(sz);
-  stackSize = KERNBASE - PGSIZE;    //starting point of the stack bc it grows backwards
-  if((sz = allocuvm(pgdir, stackSize, stackSize + 8)) == 0) //dont want to exceed the user memory
+  uint stackSize = KERNBASE - PGSIZE;    //starting point of the stack bc it grows backwards
+  if((sp = allocuvm(pgdir, stackSize-1, KERNBASE-1)) == 0) //dont want to exceed the user memory
     goto bad;
-  clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
-  sp = TOPSTACK;
+ // clearpteu(pgdir, (char*)(stackSize - 2*PGSIZE));
+  
+  curproc->stackSZ = 1;
 
   // Push argument strings, prepare rest of stack in ustack.
   for(argc = 0; argv[argc]; argc++) {
@@ -98,6 +99,7 @@ exec(char *path, char **argv)
   oldpgdir = curproc->pgdir;
   curproc->pgdir = pgdir;
   curproc->sz = sz;
+ // curproc->stackSZ = stackSZ;
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
   switchuvm(curproc);
